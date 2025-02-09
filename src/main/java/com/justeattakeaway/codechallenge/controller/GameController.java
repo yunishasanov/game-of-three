@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/game")
 class GameController {
 
-  @Autowired
+  public GameController(GameService gameService) {
+    this.gameService = gameService;
+  }
+
   private GameService gameService;
 
   @GetMapping("/start")

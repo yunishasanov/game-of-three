@@ -1,28 +1,30 @@
 package com.justeattakeaway.codechallenge.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Service;
-
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
 
 @Service
 public class GameService {
-  private static final String TOPIC = "game-moves";
 
-  @Autowired
+  private static final String TOPIC = "game-moves";
+  private static final String GROUP_ID = "game-group";
+  private static final String AUTOMATIC_MODE = "automatic";
+  private final AtomicInteger lastReceivedNumber = new AtomicInteger(-1);
   private KafkaTemplate<String, String> kafkaTemplate;
 
   @Value("${game.mode}")
   private String gameMode;
 
-  private final AtomicInteger lastReceivedNumber = new AtomicInteger(-1);
+  public GameService(KafkaTemplate<String, String> kafkaTemplate) {
+    this.kafkaTemplate = kafkaTemplate;
+  }
 
   public void startGame() {
-    int number = new Random().nextInt(100) + 2; // Generate random number >= 2
+    int number = new Random().nextInt(100) + 2; // just for starting from 2
     System.out.println("Starting game with number: " + number);
     sendMove(number);
   }
@@ -31,7 +33,7 @@ public class GameService {
     kafkaTemplate.send(TOPIC, String.valueOf(number));
   }
 
-  @KafkaListener(topics = TOPIC, groupId = "game-group")
+  @KafkaListener(topics = TOPIC, groupId = GROUP_ID)
   public void receiveMove(String message) {
     int number = Integer.parseInt(message);
     System.out.println("Received number: " + number);
@@ -41,11 +43,11 @@ public class GameService {
       return;
     }
 
-    lastReceivedNumber.set(number); // Store for manual mode
+    lastReceivedNumber.set(number);
 
-    if ("automatic".equalsIgnoreCase(gameMode)) {
+    if (AUTOMATIC_MODE.equalsIgnoreCase(gameMode)){
       processMove(number);
-    } else {
+    } else{
       System.out.println("Waiting for manual input. Call /game/move?adjustment={-1,0,1}.");
     }
   }
@@ -58,7 +60,9 @@ public class GameService {
   }
 
   private int getAdjustment(int number) {
-    if (number % 3 == 0) return 0;
+    if (number % 3 == 0) {
+      return 0;
+    }
     return (number % 3 == 1) ? -1 : 1;
   }
 
